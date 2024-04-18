@@ -4,18 +4,19 @@ from flask_login import login_user, logout_user, login_required
 from app.models.models import User
 from app.extensions import db
 from app.services.transcription_service import process_audio_and_transcribe
+import logging
 
 bp = Blueprint('api', __name__)
 
-@bp.route('/login', methods=['POST'])
-def login():
-    print("Headers Received:", request.headers)  # Debugging output
-    print("Content-Type:", request.content_type)  # Specific debug for Content-Type
+@bp.route('/api_login', methods=['POST'])  # Rename to avoid conflict
+def api_login():
+    logging.debug("Headers Received: %s", request.headers)  # Use logging instead of print
+    logging.debug("Content-Type: %s", request.content_type)
 
     if not request.content_type or 'application/json' not in request.content_type:
         return jsonify({'error': 'Unsupported Media Type', 'message': 'Content-Type must be application/json'}), 415
 
-    data = request.get_json(force=True)  # Using force=True to ignore Content-Type header
+    data = request.get_json(force=True)
     if not data:
         return jsonify({'error': 'Bad Request', 'message': 'No JSON data provided'}), 400
 
@@ -29,7 +30,7 @@ def login():
     else:
         return jsonify({'message': 'Invalid username or password'}), 401
 
-@bp.route('/logout')
+@bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()
@@ -42,7 +43,7 @@ def get_users():
     return jsonify([{'id': user.id, 'username': user.username, 'email': user.email} for user in users])
 
 @bp.route('/transcribe', methods=['POST'])
-@login_required
+## @login_required
 def transcribe_audio_api():
     response, status_code = process_audio_and_transcribe(request)
     return response, status_code
