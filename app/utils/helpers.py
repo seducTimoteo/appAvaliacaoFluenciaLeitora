@@ -4,13 +4,25 @@ import speech_recognition as sr
 import wave
 import nltk
 from contextlib import contextmanager
+from pydub import AudioSegment
+import io
 
 # Ensure necessary NLTK data is downloaded
 nltk.download('punkt')
 
 def transcribe_audio(audio_file_path: str) -> str:
     recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file_path) as source:
+    # Convert audio to a compatible format (wav) if it's in ogg format
+    if audio_file_path.endswith('.ogg'):
+        sound = AudioSegment.from_ogg(audio_file_path)
+        buffer = io.BytesIO()
+        sound.export(buffer, format="wav")
+        buffer.seek(0)
+        audio_file = sr.AudioFile(buffer)
+    else:
+        audio_file = sr.AudioFile(audio_file_path)
+    
+    with audio_file as source:
         audio_data = recognizer.record(source)
     try:
         transcript = recognizer.recognize_google(audio_data, language='pt-BR')
@@ -42,26 +54,22 @@ def get_word_count(transcript: str) -> int:
     words_transcript = nltk.word_tokenize(transcript.lower())
     return len(words_transcript)
 
-def determine_reading_level(accuracy: float) -> str:
-    if accuracy == 100:
+def determine_reading_level(crdi: float) -> str:
+    if crdi >= 0.75:
         return "Nível 4 - Leitor Fluente"
-    elif accuracy >= 50:
+    elif crdi >= 0.50:
         return "Nível 3 - Silabou ao realizar a leitura das palavras"
-    elif accuracy > 0:
+    elif crdi > 0.25:
         return "Nível 2 - Pré-leitor - aluno tem dificuldade em ler"
     else:
         return "Nível 1 - Leitor iniciante"
 
 def calculate_crdi(transcript: str, reference_text: str, audio_duration: float) -> float:
     wpm = calculate_words_per_minute(transcript, audio_duration)
-    normalized_wpm = wpm / 100  # Assuming 100 WPM as a normal reading speed
     accuracy = calculate_word_accuracy(transcript, reference_text)
-    
-    # Weights for CRDI calculation
     accuracy_weight = 0.5
     wpm_weight = 0.5
-    
-    crdi = (accuracy_weight * accuracy) + (wpm_weight * normalized_wpm)
+    crdi = (accuracy_weight * accuracy) + (wpm_weight * (wpm / 100))  # Normalizing WPM by assuming 100 WPM as normal
     return crdi
 
 @contextmanager
